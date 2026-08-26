@@ -120,6 +120,20 @@ teardown() {
   run ddev add-on get "${DIR}"
   assert_success
   require_emulator_addon
+
+  # Reinstall from the working tree, because the line above just replaced it.
+  #
+  # The emulator add-on declares `dependencies: [codementality/ddev-floci-ui]`.
+  # DDEV matches that string against installed manifest NAMES, and an add-on
+  # installed from a local directory registers as plain `floci-ui` — so the
+  # dependency looks unsatisfied and DDEV installs floci-ui from its published
+  # release, silently overwriting the code under test with the last tagged
+  # version. Without this, the test measures the previous release rather than
+  # this branch, and passes or fails for reasons that have nothing to do with
+  # the change being tested.
+  run ddev add-on get "${DIR}"
+  assert_success
+
   run ddev restart -y
   assert_success
 

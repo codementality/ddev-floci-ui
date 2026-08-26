@@ -12,6 +12,7 @@ installed.
 One console per project, showing AWS, Azure and GCP side by side.
 
 - [Installation](#installation)
+- [Working on this add-on locally](#working-on-this-add-on-locally)
 - [Why it is a separate add-on](#why-it-is-a-separate-add-on)
 - [How it finds your emulators](#how-it-finds-your-emulators)
 - [Versus the "Open Floci UI" button](#versus-the-open-floci-ui-button)
@@ -38,6 +39,31 @@ before you have picked a cloud:
 ```bash
 ddev add-on get codementality/ddev-floci-ui
 ```
+
+### Working on this add-on locally
+
+One trap worth knowing if you hack on this repo. Installing an emulator add-on
+**replaces a locally-installed `floci-ui` with the published release**:
+
+```bash
+ddev add-on get ~/dev/ddev-floci-ui        # your working tree
+ddev add-on get codementality/ddev-floci-gcp
+# ^ its dependency just overwrote your working tree with the last tagged release
+```
+
+DDEV matches the dependency string `codementality/ddev-floci-ui` against
+installed manifest *names*, and an add-on installed from a local directory
+registers as plain `floci-ui`. The names do not match, so DDEV concludes the
+dependency is missing and installs it from GitHub — silently reverting your
+changes.
+
+Reinstall from your working tree afterwards:
+
+```bash
+ddev add-on get ~/dev/ddev-floci-ui
+```
+
+The test suite does exactly this, for exactly this reason.
 
 ## Why it is a separate add-on
 
