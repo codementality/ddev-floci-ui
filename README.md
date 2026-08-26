@@ -1,5 +1,6 @@
 # ddev-floci-ui <!-- omit in toc -->
 
+[![add-on registry](https://img.shields.io/badge/DDEV-Add--on_Registry-blue)](https://addons.ddev.com)
 [![tests](https://github.com/codementality/ddev-floci-ui/actions/workflows/tests.yml/badge.svg)](https://github.com/codementality/ddev-floci-ui/actions/workflows/tests.yml)
 [![last commit](https://img.shields.io/github/last-commit/codementality/ddev-floci-ui)](https://github.com/codementality/ddev-floci-ui/commits)
 [![release](https://img.shields.io/github/v/release/codementality/ddev-floci-ui)](https://github.com/codementality/ddev-floci-ui/releases/latest)
@@ -17,6 +18,7 @@ One console per project, showing AWS, Azure and GCP side by side.
 - [The `ddev floci-ui` command](#the-ddev-floci-ui-command)
 - [Configuration](#configuration)
 - [Removing the add-on](#removing-the-add-on)
+- [Licensing](#licensing)
 - [Credits](#credits)
 
 ## Installation
@@ -155,10 +157,26 @@ DDEV refuses while any emulator add-on still declares it as a dependency; remove
 those first, or keep the console. `.ddev/.env.floci-ui` is left in place so your
 settings survive a reinstall.
 
+## Licensing
+
+Two different licences are in play here, and it is worth being explicit about
+which covers what:
+
+- **This add-on** — the compose files, the `ddev floci-ui` command, the init
+  scripts and the documentation — is licensed **Apache 2.0**, matching the DDEV
+  add-on template and DDEV's own add-ons. See [LICENSE](LICENSE).
+- **Floci UI itself** is licensed **MIT** by the
+  [floci-io](https://github.com/floci-io/floci-ui) project, and is entirely separate work.
+
+**No Floci source is vendored in this repository.** The add-on only references
+the published `floci/floci-ui` image, which Docker pulls at runtime; nothing
+here redistributes Floci code or binaries. If you redistribute this add-on you
+are redistributing Apache-2.0 material only.
+
 ## Credits
 
-Floci UI is by the [floci-io](https://github.com/floci-io/floci-ui) project, MIT
-licensed. This add-on only packages it; no Floci source is vendored here.
+Floci UI is by the [floci-io](https://github.com/floci-io/floci-ui) project, MIT licensed. This add-on packages
+it under Apache 2.0; see [Licensing](#licensing) above.
 
 Behavioural notes in this README were verified against `floci/floci-ui:0.3.0` on 2026-08-26.
 Upstream ships frequently; the nightly workflow in `.github/workflows/tests.yml`

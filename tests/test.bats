@@ -15,6 +15,18 @@ setup() {
   # Override this variable for your add-on:
   export GITHUB_REPO=codementality/ddev-floci-ui
 
+  # An emulator add-on to test the dependency relationship against.
+  #
+  # This add-on has to be RELEASED BEFORE the emulator ones, because each of
+  # them declares it as a dependency. So on a first release the sibling does not
+  # exist yet, and the tests that need it skip rather than fail. Override to
+  # test against a branch or a fork once both are published:
+  #   FLOCI_EMULATOR_ADDON=codementality/ddev-floci-az bats ./tests/test.bats
+  #
+  # A local path works only if that checkout's own floci-ui dependency also
+  # resolves; otherwise its install fails and those tests simply skip.
+  export FLOCI_EMULATOR_ADDON="${FLOCI_EMULATOR_ADDON:-codementality/ddev-floci-gcp}"
+
   TEST_BREW_PREFIX="$(brew --prefix 2>/dev/null || true)"
   export BATS_LIB_PATH="${BATS_LIB_PATH}:${TEST_BREW_PREFIX}/lib:/usr/lib/bats"
   bats_load_library bats-assert
@@ -36,6 +48,16 @@ setup() {
   assert_success
   run ddev start -y
   assert_success
+}
+
+# Installs the emulator add-on, or skips the calling test if it is not
+# published yet. `ddev add-on get` on a missing repo fails with "not found in
+# cached add-on registry" — a red CI run on a brand-new repo, for a reason that
+# has nothing to do with this add-on being broken.
+require_emulator_addon() {
+  if ! ddev add-on get "${FLOCI_EMULATOR_ADDON}" >/dev/null 2>&1; then
+    skip "${FLOCI_EMULATOR_ADDON} is not published yet"
+  fi
 }
 
 health_checks() {
@@ -97,8 +119,7 @@ teardown() {
   set -eu -o pipefail
   run ddev add-on get "${DIR}"
   assert_success
-  run ddev add-on get codementality/ddev-floci-gcp
-  assert_success
+  require_emulator_addon
   run ddev restart -y
   assert_success
 
@@ -116,8 +137,7 @@ teardown() {
 @test "emulator add-ons pull this one in, and it cannot be removed while needed" {
   set -eu -o pipefail
   # No explicit install of floci-ui — the dependency does it.
-  run ddev add-on get codementality/ddev-floci-gcp
-  assert_success
+  require_emulator_addon
   assert_file_exist "${TESTDIR}/.ddev/docker-compose.floci-ui.yaml"
 
   # DDEV refuses to orphan a console another add-on still declares.
