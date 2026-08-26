@@ -1,0 +1,41 @@
+name: floci-ui
+
+# Requires `ddev dotenv` and modern add-on removal handling.
+ddev_version_constraint: '>= v1.24.10'
+
+project_files:
+  - docker-compose.floci-ui.yaml
+  - commands/host/floci-ui
+
+post_install_actions:
+  - chmod +x commands/host/floci-ui
+  - |
+    #ddev-description:Report how floci-ui is wired up
+    echo "The Floci console will be at https://${DDEV_HOSTNAME}:4511 — open it with 'ddev floci-ui'."
+    echo "It shows whichever emulators are installed in this project; 'ddev floci-ui clouds'"
+    echo "reports which ones it can currently reach."
+  - |
+    #ddev-description:Note if no emulator is installed yet
+    # The console on its own has nothing to show. Say so rather than leaving
+    # someone staring at three unreachable clouds.
+    found=""
+    for c in aws az gcp; do
+      [ -f "${DDEV_APPROOT}/.ddev/docker-compose.floci-${c}.yaml" ] && found="${found} floci-${c}"
+    done
+    if [ -z "${found}" ]; then
+      echo "Note: no Floci emulator is installed in this project yet, so the console"
+      echo "will show every cloud as unreachable. Add one with:"
+      echo "  ddev add-on get codementality/ddev-floci-aws"
+      echo "  ddev add-on get codementality/ddev-floci-gcp"
+      echo "  ddev add-on get codementality/ddev-floci-az"
+    else
+      echo "Emulators found in this project:${found}"
+    fi
+
+removal_actions:
+  - |
+    #ddev-description:Note the floci-ui .env file
+    file="${DDEV_APPROOT}/.ddev/.env.floci-ui"
+    if [ -f "${file}" ]; then
+      echo "Leaving '${file}' in place; delete it manually if you no longer need your floci-ui settings."
+    fi

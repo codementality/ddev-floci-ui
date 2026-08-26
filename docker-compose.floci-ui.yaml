@@ -1,0 +1,63 @@
+#ddev-generated
+# floci-ui: the local cloud console for the Floci emulators (https://floci.io).
+#
+# One console per project, not one per cloud. The UI is multi-cloud — it reads
+# one endpoint per cloud and shows whichever are reachable — so it is its own
+# add-on rather than something each emulator add-on ships. If it were bundled
+# three times, installing two emulators would produce two compose files both
+# defining a service named `floci-ui`, and removing either would take the shared
+# service with it.
+#
+# The AWS emulator can also launch a console itself, from the "Open Floci UI"
+# button on its landing page. That one is a container named `floci-ui`
+# GLOBALLY, published on 0.0.0.0:4500, attached to whichever project's network
+# reached it first — so a second project's button shows the first project's
+# data. This service is the project-scoped alternative: its own container name,
+# and exposed through ddev-router by hostname rather than by claiming a host
+# port, so any number of projects can run it at once.
+services:
+  floci-ui:
+    container_name: ddev-${DDEV_SITENAME}-floci-ui
+    image: ${FLOCI_UI_IMAGE:-floci/floci-ui:latest}
+    restart: "no"
+    expose:
+      - 4500
+    # These labels ensure this service is discoverable by DDEV.
+    labels:
+      com.ddev.site-name: ${DDEV_SITENAME}
+      com.ddev.approot: ${DDEV_APPROOT}
+    environment:
+      # ddev-router, routed by hostname: these ports are shared between every
+      # project running this add-on rather than owned by one of them.
+      #
+      # 4510/4511 rather than the console's native 4500. The AWS emulator's
+      # "Open Floci UI" button starts a global container that publishes
+      # 0.0.0.0:4500, so a router entrypoint on 4500 loses the race to it and
+      # `ddev start` fails with "port 4500 is already in use". Staying off 4500
+      # means both consoles can exist without a fight.
+      VIRTUAL_HOST: ${DDEV_HOSTNAME}
+      HTTP_EXPOSE: ${FLOCI_UI_HTTP_PORT:-4510}:4500
+      HTTPS_EXPOSE: ${FLOCI_UI_HTTPS_PORT:-4511}:4500
+
+      # One endpoint per cloud, set unconditionally so that installing a second
+      # emulator later needs no change here. A cloud whose add-on is not
+      # installed has no such container, so the console reports it unreachable.
+      #
+      # These name the CONTAINER (ddev-<project>-floci-gcp), not the service
+      # hostname (floci-gcp), and that distinction is load-bearing. This service
+      # has to sit on DDEV's shared `ddev_default` network for ddev-router to
+      # reach it — and every project's emulator is aliased by its bare service
+      # hostname on that same shared network. So a project with no AWS emulator
+      # asking for `floci-aws` resolves to some OTHER project's AWS emulator,
+      # and the console cheerfully displays another project's data. Container
+      # names are unique per project, so they cannot collide that way.
+      FLOCI_ENDPOINT: ${FLOCI_UI_AWS_ENDPOINT:-http://ddev-${DDEV_SITENAME}-floci-aws:4566}
+      FLOCI_AZURE_ENDPOINT: ${FLOCI_UI_AZURE_ENDPOINT:-http://ddev-${DDEV_SITENAME}-floci-az:4577}
+      FLOCI_AZURE_ACCOUNT_NAME: ${FLOCI_AZ_ACCOUNT_NAME:-devstoreaccount1}
+      FLOCI_GCP_ENDPOINT: ${FLOCI_UI_GCP_ENDPOINT:-http://ddev-${DDEV_SITENAME}-floci-gcp:4588}
+      FLOCI_GCP_PROJECT: ${FLOCI_GCP_DEFAULT_PROJECT_ID:-floci-local}
+      FLOCI_DEFAULT_REGION: ${FLOCI_AWS_REGION:-us-east-1}
+    x-ddev:
+      describe-info: |
+        Console: https://${DDEV_HOSTNAME}:${FLOCI_UI_HTTPS_PORT:-4511}
+        Launch:  ddev floci-ui

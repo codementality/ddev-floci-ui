@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+## #ddev-generated
+## Description: Open the Floci local cloud console
+## Usage: floci-ui [url|clouds|logs|status] [args]
+## Example: "ddev floci-ui"\n"ddev floci-ui url"\n"ddev floci-ui clouds"\n"ddev floci-ui logs -f"
+
+set -eu -o pipefail
+
+CONTAINER="ddev-${DDEV_PROJECT}-floci-ui"
+ENV_FILE="${DDEV_APPROOT}/.ddev/.env.floci-ui"
+
+dotenv() {
+  local value
+  value="$(grep -sE "^${1}=" "${ENV_FILE}" | tail -n1 | cut -d= -f2- | tr -d '\047" ' || true)"
+  echo "${value:-$2}"
+}
+
+HTTPS_PORT="$(dotenv FLOCI_UI_HTTPS_PORT 4511)"
+URL="https://${DDEV_HOSTNAME%%,*}:${HTTPS_PORT}"
+
+require_running() {
+  if ! docker inspect "${CONTAINER}" >/dev/null 2>&1; then
+    echo "The Floci console is not running. Try 'ddev start'." >&2
+    exit 1
+  fi
+}
+
+case "${1:-launch}" in
+  launch)
+    require_running
+    # `ddev launch` knows how to open a URL on every platform DDEV supports.
+    ddev launch "${URL}"
+    ;;
+
+  url)
+    echo "${URL}"
+    ;;
+
+  clouds)
+    # Which emulators the console can actually reach right now.
+    #
+    # Deliberately NOT /api/clouds: that lists every cloud the console knows how
+    # to speak to, and reports all three as "available" whether or not an
+    # emulator exists. The per-cloud /status endpoint is the one that actually
+    # probes the runtime.
+    require_running
+    for cloud in aws azure gcp; do
+      status="$(curl -sk --max-time 5 "${URL}/api/clouds/${cloud}/status" || true)"
+      case "${status}" in
+        *'"runtime":"reachable"'*) state="reachable" ;;
+        '')                        state="no answer from the console" ;;
+        *)                         state="unavailable" ;;
+      esac
+      endpoint="$(echo "${status}" | sed -n 's/.*"endpoint":"\([^"]*\)".*/\1/p')"
+      printf '%-6s %-13s %s\n' "${cloud}" "${state}" "${endpoint}"
+    done
+    ;;
+
+  status)
+    require_running
+    docker inspect --format '{{.State.Status}}' "${CONTAINER}"
+    ;;
+
+  logs)
+    require_running
+    shift
+    docker logs "${CONTAINER}" "$@"
+    ;;
+
+  *)
+    echo "usage: ddev floci-ui [url|clouds|logs|status]" >&2
+    exit 1
+    ;;
+esac
