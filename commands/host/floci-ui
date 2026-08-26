@@ -88,7 +88,11 @@ case "${1:-launch}" in
           azure) var=FLOCI_AZURE_ENDPOINT ;;
           gcp)   var=FLOCI_GCP_ENDPOINT ;;
         esac
-        endpoint="$(docker exec "${CONTAINER}" printenv "${var}" 2>/dev/null | tr -d '\r')"
+        # `|| true`: printenv exits non-zero for an unset variable, and
+        # docker exec fails outright on a stopped container. Either would kill
+        # this script under `set -e` — in the exact case this fallback exists
+        # to handle.
+        endpoint="$(docker exec "${CONTAINER}" printenv "${var}" 2>/dev/null | tr -d '\r' || true)"
       fi
       printf '%-6s %-13s %s\n' "${cloud}" "${state}" "${endpoint}"
     done
