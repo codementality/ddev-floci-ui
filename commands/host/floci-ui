@@ -45,14 +45,51 @@ case "${1:-launch}" in
     # emulator exists. The per-cloud /status endpoint is the one that actually
     # probes the runtime.
     require_running
+
+    # Is the console itself up? Asked once, so that a slow per-cloud probe below
+    # cannot be mistaken for the console being down.
+    if ! curl -sk --max-time 15 -o /dev/null "${URL}/api/clouds"; then
+      echo "The console is not answering at ${URL}. Try 'ddev restart'." >&2
+      exit 1
+    fi
+
+    # The console probes the runtime when asked, and a probe against a cloud
+    # whose emulator is not installed has to wait out a DNS or connect failure —
+    # milliseconds on some hosts, tens of seconds on others (a CI runner
+    # especially). So the timeout is generous, and a timeout is reported as
+    # `unavailable` rather than as its own state: reachability is what the
+    # caller asked about, and how slowly the negative answer arrived is not
+    # interesting.
+    #
+    # Run the three concurrently, or a project with no emulators installed waits
+    # out three consecutive timeouts to be told the same thing three times.
+    probes="$(mktemp -d)"
+    trap 'rm -rf "${probes}"' EXIT
     for cloud in aws azure gcp; do
-      status="$(curl -sk --max-time 5 "${URL}/api/clouds/${cloud}/status" || true)"
+      ( curl -sk --max-time 60 "${URL}/api/clouds/${cloud}/status" \
+          > "${probes}/${cloud}" 2>/dev/null || true ) &
+    done
+    wait
+
+    for cloud in aws azure gcp; do
+      status="$(cat "${probes}/${cloud}" 2>/dev/null || true)"
       case "${status}" in
         *'"runtime":"reachable"'*) state="reachable" ;;
-        '')                        state="no answer from the console" ;;
         *)                         state="unavailable" ;;
       esac
+
+      # Prefer the endpoint the console reports; fall back to the one configured
+      # on the container, so the column is populated even when the probe timed
+      # out and returned nothing at all.
       endpoint="$(echo "${status}" | sed -n 's/.*"endpoint":"\([^"]*\)".*/\1/p')"
+      if [ -z "${endpoint}" ]; then
+        case "${cloud}" in
+          aws)   var=FLOCI_ENDPOINT ;;
+          azure) var=FLOCI_AZURE_ENDPOINT ;;
+          gcp)   var=FLOCI_GCP_ENDPOINT ;;
+        esac
+        endpoint="$(docker exec "${CONTAINER}" printenv "${var}" 2>/dev/null | tr -d '\r')"
+      fi
       printf '%-6s %-13s %s\n' "${cloud}" "${state}" "${endpoint}"
     done
     ;;
